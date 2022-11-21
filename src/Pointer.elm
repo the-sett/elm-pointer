@@ -1,15 +1,15 @@
 module Pointer exposing
     ( Config, defaultConfig
     , Model, Msg, init, update
-    , PointerPorts, subscriptions
-    , on
-    , DragArgs, PointArgs, ScaleArgs
+    , PointerPorts
     , EventKind(..)
+    , on, subscriptions
+    , DragArgs, PointArgs, ScaleArgs
+    , Handlers
     , apply, empty
     , onClick, onDoubleClick, onDrag, onDragStart
     , onWheel, onPinch
     , onMove, onPointerUp
-    , Handlers
     )
 
 {-| Pointer is a high-level pointer API that unifies pointer events over all
@@ -30,14 +30,15 @@ events with `Pixels` for units.
 @docs Model, Msg, init, update
 
 
-# Pointer subscriptions, needed for listening at the overall HTML Document level.
+# Pointer ports, needed for listening at the overall HTML Document level.
 
-@docs PointerPorts, subscriptions
+@docs PointerPorts
 
 
 # Event handlers for adding to the view, for listening to pointer events below the Document level.
 
-@docs on, Handlers
+@docs EventKind
+@docs on, subscriptions
 
 
 # Pointer event records.
@@ -45,9 +46,9 @@ events with `Pixels` for units.
 @docs DragArgs, PointArgs, ScaleArgs
 
 
-# A DSL for defining use gesture handling behaviour.
+# A DSL for defining user gesture handling.
 
-@docs EventKind
+@docs Handlers
 @docs apply, empty
 @docs onClick, onDoubleClick, onDrag, onDragStart
 @docs onWheel, onPinch
@@ -68,6 +69,13 @@ import Task.Extra
 import Update2 as U2
 
 
+{-| Some configurable parameters of the Pointer.
+
+    dragThreshold - how many pixels the pointer must move when engaged to be considered a drag.
+    holdTimeMillis - how many milliseconds the pointer must hold down to be considered a hold.
+    mouseWheelZoomStep - the zoom factor to assign to each mouse wheel step.
+
+-}
 type alias Config =
     { dragThreshold : Int
     , holdTimeMillis : Int
@@ -75,6 +83,9 @@ type alias Config =
     }
 
 
+{-| A default configuration.
+-}
+defaultConfig : Config
 defaultConfig =
     { dragThreshold = 3
     , holdTimeMillis = 1000
@@ -86,6 +97,8 @@ defaultConfig =
 -- Model
 
 
+{-| The internal model of the pointer.
+-}
 type Model a msg coordinates
     = Model
         { state : State a coordinates
@@ -132,12 +145,16 @@ type alias ButtonHandler a msg coordinates =
     }
 
 
+{-| When a pointer is referencing a point on the screen it reports these args.
+-}
 type alias PointArgs coordinates =
     { button : Int
     , pos : Point2d Pixels coordinates
     }
 
 
+{-| When a pointer is dragged it reports these values.
+-}
 type alias DragArgs coordinates =
     { startPos : Point2d Pixels coordinates
     , pos : Point2d Pixels coordinates
@@ -145,6 +162,8 @@ type alias DragArgs coordinates =
     }
 
 
+{-| When a pointer performs a scaling operation it reports these values.
+-}
 type alias ScaleArgs coordinates =
     { pos : Point2d Pixels coordinates
     , scale : Float
@@ -155,6 +174,8 @@ type alias ScaleArgs coordinates =
 -- Internal Events
 
 
+{-| Internal pointer events.
+-}
 type Msg a coordinates
     = PointerUpEvent a (PointerEvent coordinates)
     | PointerDownEvent a (PointerEvent coordinates)
@@ -166,6 +187,8 @@ type Msg a coordinates
     | Error Decode.Error
 
 
+{-| Provides a classification of the type of event a pointer is performing.
+-}
 type EventKind
     = UpEvent
     | DownEvent
@@ -201,6 +224,8 @@ type alias WheelEvent coordinates =
 -- TEA Functions
 
 
+{-| Creates a new pointer model with no handlers set on it yet.
+-}
 init : Maybe Config -> (Msg a coordinates -> msg) -> Model a msg coordinates
 init maybeConfig toMsg =
     { state =
@@ -217,6 +242,8 @@ init maybeConfig toMsg =
         |> Model
 
 
+{-| The pointer update function, which should be applied to all pointer [Msgs](#Msg).
+-}
 update : Msg a coordinates -> Model a msg coordinates -> ( Model a msg coordinates, Cmd msg )
 update msg model =
     case msg of
@@ -262,6 +289,9 @@ update msg model =
 -- Pointer subscriptions, needed for listening at the overall HTML Document level.
 
 
+{-| Defines the ports which this pointer module needs to listen to HTML pointer events on the
+whole document.
+-}
 type alias PointerPorts msg =
     { onPointerDown : (Value -> msg) -> Sub msg
     , onPointerUp : (Value -> msg) -> Sub msg
@@ -270,6 +300,12 @@ type alias PointerPorts msg =
     }
 
 
+{-| Defines the subscriptions a pointer needs to listen to HTML pointer events on whole document.
+
+These events are not provided by `elm/browser` so must be accessed through ports. Consult the README
+for instructions on how to set up the ports.
+
+-}
 subscriptions : PointerPorts msg -> Model a msg coordinates -> (EventKind -> Decoder a) -> Sub msg
 subscriptions ports (Model model) decoderFn =
     let
@@ -333,6 +369,8 @@ subscriptions ports (Model model) decoderFn =
 -- Event handlers for adding to the view, for listening to pointer events below the Document level.
 
 
+{-| Attaches a pointer model to a TEA view as a list of HTML event handler attributes.
+-}
 on : Model a msg coordinates -> (EventKind -> Decoder a) -> List (Html.Attribute msg)
 on (Model model) decoderFn =
     let
@@ -856,6 +894,8 @@ scaleWheel value args (Model model) =
 -- DSL for defining gesture handlers.
 
 
+{-| A set of Handlers provides functions that turn pointer events into TEA events.
+-}
 type Handlers a msg coordinates
     = Handlers
         { buttonHandlers : Dict Int (ButtonHandler a msg coordinates)
@@ -865,6 +905,8 @@ type Handlers a msg coordinates
         }
 
 
+{-| A default set of empty handlers that ignore all pointer events.
+-}
 empty : Handlers a msg coordinates
 empty =
     Handlers
@@ -875,6 +917,9 @@ empty =
         }
 
 
+{-| Applies a set of handlers to the pointer model. The resulting pointer model will generate TEA
+events through the handlers.
+-}
 apply : Handlers a msg coordinates -> Model a msg coordinates -> Model a msg coordinates
 apply (Handlers handlers) (Model model) =
     { model
@@ -886,6 +931,8 @@ apply (Handlers handlers) (Model model) =
         |> Model
 
 
+{-| Adds a click handler.
+-}
 onClick :
     Int
     -> { h | click : PointArgs coordinates -> a -> msg }
@@ -909,6 +956,8 @@ onClick button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a double click handler.
+-}
 onDoubleClick :
     Int
     -> { h | doubleClick : PointArgs coordinates -> a -> msg }
@@ -932,6 +981,8 @@ onDoubleClick button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a click and hold handler.
+-}
 onClickAndHold :
     Int
     -> { h | clickAndHold : PointArgs coordinates -> a -> msg }
@@ -955,6 +1006,8 @@ onClickAndHold button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a drag handler.
+-}
 onDrag :
     Int
     ->
@@ -983,6 +1036,8 @@ onDrag button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a drag start handler.
+-}
 onDragStart :
     Int
     -> { h | dragStart : DragArgs coordinates -> a -> msg }
@@ -1006,6 +1061,8 @@ onDragStart button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a move handler.
+-}
 onMove :
     { h | move : Point2d Pixels coordinates -> a -> msg }
     -> Handlers a msg coordinates
@@ -1017,6 +1074,8 @@ onMove spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a pointer up handler.
+-}
 onPointerUp :
     Int
     -> { h | pointerUp : PointArgs coordinates -> a -> msg }
@@ -1040,6 +1099,8 @@ onPointerUp button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a pointer down handler.
+-}
 onPointerDown :
     Int
     -> { h | pointerDown : PointArgs coordinates -> a -> msg }
@@ -1063,6 +1124,8 @@ onPointerDown button spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a mouse wheel handler.
+-}
 onWheel :
     { h | wheel : ScaleArgs coordinates -> a -> msg }
     -> Handlers a msg coordinates
@@ -1074,6 +1137,8 @@ onWheel spec (Handlers handlers) =
         |> Handlers
 
 
+{-| Adds a touch zoom pinch handler.
+-}
 onPinch :
     { h | pinch : ScaleArgs coordinates -> a -> msg }
     -> Handlers a msg coordinates
