@@ -1,5 +1,5 @@
 module Pointer exposing
-    ( Config
+    ( Config, defaultConfig
     , Model, Msg, init, update
     , PointerPorts, subscriptions
     , on
@@ -22,12 +22,12 @@ events with `Pixels` for units.
 
 # Configurable parameters.
 
-@docs Config
+@docs Config, defaultConfig
 
 
 # The TEA structure for hooking up the internal state into your application.
 
-@docs Model, Msg, init, update, defaultConfig
+@docs Model, Msg, init, update
 
 
 # Pointer subscriptions, needed for listening at the overall HTML Document level.
@@ -37,7 +37,7 @@ events with `Pixels` for units.
 
 # Event handlers for adding to the view, for listening to pointer events below the Document level.
 
-@docs on
+@docs on, Handlers
 
 
 # Pointer event records.
