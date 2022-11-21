@@ -1,0 +1,24 @@
+{
+    "type": "package",
+    "name": "the-sett/elm-pointer",
+    "summary": "An HTML pointer API for simplifying working with mouse and touch together.",
+    "license": "MIT",
+    "version": "1.0.0",
+    "exposed-modules": [
+        "Pointer"
+    ],
+    "elm-version": "0.19.0 <= v < 0.20.0",
+    "dependencies": {
+        "elm/browser": "1.0.2 <= v < 2.0.0",
+        "elm/core": "1.0.0 <= v < 2.0.0",
+        "elm/html": "1.0.0 <= v < 2.0.0",
+        "elm/json": "1.0.0 <= v < 2.0.0",
+        "elm-community/json-extra": "4.3.0 <= v < 5.0.0",
+        "elm-community/maybe-extra": "5.3.0 <= v < 6.0.0",
+        "elm-community/typed-svg": "7.0.0 <= v < 8.0.0",
+        "ianmackenzie/elm-geometry": "3.9.1 <= v < 4.0.0",
+        "ianmackenzie/elm-units": "2.9.0 <= v < 3.0.0",
+        "the-sett/elm-update-helper": "2.2.0 <= v < 3.0.0"
+    },
+    "test-dependencies": {}
+}
