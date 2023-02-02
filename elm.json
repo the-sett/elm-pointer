@@ -3,7 +3,7 @@
     "name": "the-sett/elm-pointer",
     "summary": "An HTML pointer API for simplifying working with mouse and touch together.",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "exposed-modules": [
         "Pointer"
     ],
