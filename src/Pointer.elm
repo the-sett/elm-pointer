@@ -114,7 +114,21 @@ type Model a msg coordinates
 type alias State a coordinates =
     { pointers : Dict Int (PointerState a coordinates)
     , gesture : GestureState
+    , drag : DragState
     }
+
+
+{-| State machine used to ensure that click events are suppressed by dragging.
+
+The `ResetDragging` state is used to indicate that a dragging event has completed
+within the last cycle of pointer activity, and is used to suppress generation of click
+events in that case.
+
+-}
+type DragState
+    = NotDragging
+    | Dragging
+    | ResetDragging
 
 
 type GestureState
@@ -231,6 +245,7 @@ init maybeConfig toMsg =
     { state =
         { pointers = Dict.empty
         , gesture = NoPointer
+        , drag = NotDragging
         }
     , buttonHandlers = Dict.empty
     , wheelHandler = Nothing
@@ -465,7 +480,7 @@ initPointerState value args (Model model) =
             model.state
 
         numActivePointersBefore =
-            Dict.size model.state.pointers
+            Dict.size state.pointers
 
         pointers =
             Dict.insert
@@ -478,32 +493,41 @@ initPointerState value args (Model model) =
                 }
                 state.pointers
 
+        drag =
+            case state.drag of
+                ResetDragging ->
+                    -- Clear the drag state if reset is pending.
+                    NotDragging
+
+                _ ->
+                    state.drag
+
         numActivePointersAfter =
             Dict.size pointers
 
         newState =
             case ( numActivePointersBefore, numActivePointersAfter ) of
                 ( 0, 1 ) ->
-                    { state | pointers = pointers, gesture = OnePointer }
+                    { state | pointers = pointers, gesture = OnePointer, drag = drag }
 
                 ( 1, 1 ) ->
-                    { state | pointers = pointers, gesture = OnePointer }
+                    { state | pointers = pointers, gesture = OnePointer, drag = drag }
 
                 ( 1, 2 ) ->
-                    { state | pointers = pointers, gesture = TwoPointer }
+                    { state | pointers = pointers, gesture = TwoPointer, drag = drag }
 
                 ( 2, 2 ) ->
-                    { state | pointers = pointers, gesture = TwoPointer }
+                    { state | pointers = pointers, gesture = TwoPointer, drag = drag }
 
                 _ ->
-                    { state | pointers = Dict.empty, gesture = NoPointer }
+                    { state | pointers = Dict.empty, gesture = NoPointer, drag = drag }
     in
     { model | state = newState }
         |> Model
         |> U2.pure
 
 
-{-| Clears the state assocaited with a button.
+{-| Clears the state associated with a button.
 -}
 clearPointerState : a -> PointerEvent coordinates -> Model a msg coordinates -> ( Model a msg coordinates, Cmd msg )
 clearPointerState value args (Model model) =
@@ -520,22 +544,47 @@ clearPointerState value args (Model model) =
         numActivePointersAfter =
             Dict.size pointers
 
+        isDragging =
+            Dict.foldl
+                (\_ pointerState accum ->
+                    if pointerState.dragging then
+                        True
+
+                    else
+                        accum
+                )
+                False
+                pointers
+
+        drag =
+            case state.drag of
+                Dragging ->
+                    if isDragging then
+                        Dragging
+
+                    else
+                        -- If nothing is dragging any more, signal a pending reset on the drag state.
+                        ResetDragging
+
+                _ ->
+                    state.drag
+
         newState =
             case ( numActivePointersBefore, numActivePointersAfter ) of
                 ( 0, 1 ) ->
-                    { state | pointers = pointers, gesture = OnePointer }
+                    { state | pointers = pointers, gesture = OnePointer, drag = drag }
 
                 ( 1, 1 ) ->
-                    { state | pointers = pointers, gesture = OnePointer }
+                    { state | pointers = pointers, gesture = OnePointer, drag = drag }
 
                 ( 1, 2 ) ->
-                    { state | pointers = pointers, gesture = TwoPointer }
+                    { state | pointers = pointers, gesture = TwoPointer, drag = drag }
 
                 ( 2, 2 ) ->
-                    { state | pointers = pointers, gesture = TwoPointer }
+                    { state | pointers = pointers, gesture = TwoPointer, drag = drag }
 
                 _ ->
-                    { state | pointers = Dict.empty, gesture = NoPointer }
+                    { state | pointers = Dict.empty, gesture = NoPointer, drag = drag }
     in
     { model | state = newState }
         |> Model
@@ -655,12 +704,13 @@ checkForDrag val pointerEvent (Model model) =
         state =
             model.state
 
-        ( pointerStates, dragMsgs ) =
+        ( pointerStates, dragMsgs, isDragging ) =
             Dict.foldl
-                (\pointerId pointerState ( stateAccum, msgs ) ->
+                (\pointerId pointerState ( stateAccum, msgs, isDraggingAccum ) ->
                     if pointerState.dragging then
                         ( Dict.insert pointerId pointerState stateAccum
                         , addDragMsgIfHandlerExists False pointerState.button pointerState msgs
+                        , True
                         )
 
                     else if
@@ -669,17 +719,19 @@ checkForDrag val pointerEvent (Model model) =
                     then
                         ( Dict.insert pointerId { pointerState | dragging = True } stateAccum
                         , addDragMsgIfHandlerExists True pointerState.button pointerState msgs
+                        , True
                         )
 
                     else if pointerEvent.isLeave then
                         ( Dict.insert pointerId { pointerState | dragging = True } stateAccum
                         , addDragMsgIfHandlerExists True pointerState.button pointerState msgs
+                        , True
                         )
 
                     else
-                        ( Dict.insert pointerId pointerState stateAccum, msgs )
+                        ( Dict.insert pointerId pointerState stateAccum, msgs, isDraggingAccum )
                 )
-                ( Dict.empty, [] )
+                ( Dict.empty, [], False )
                 state.pointers
 
         addDragMsgIfHandlerExists isStart pointerId pointerState msgs =
@@ -729,8 +781,16 @@ checkForDrag val pointerEvent (Model model) =
                     )
                         ++ msgs
 
+        dragState =
+            if isDragging then
+                -- If at least one pointer is dragging, set the drag state to Dragging.
+                Dragging
+
+            else
+                state.drag
+
         newState =
-            { state | pointers = pointerStates }
+            { state | pointers = pointerStates, drag = dragState }
 
         dragCmds =
             List.map Task.Extra.message dragMsgs
@@ -824,6 +884,7 @@ clearAllPointerState (Model model) =
         | state =
             { pointers = Dict.empty
             , gesture = NoPointer
+            , drag = NotDragging
             }
     }
         |> Model
@@ -850,7 +911,13 @@ checkForClickOrDouble value args (Model model) =
                 Just { click, doubleClick } ->
                     case ( click, doubleClick, args.times ) of
                         ( Just clickHandler, _, 1 ) ->
-                            clickHandler { button = args.button, pos = args.pos } value |> Task.Extra.message
+                            case model.state.drag of
+                                NotDragging ->
+                                    clickHandler { button = args.button, pos = args.pos } value |> Task.Extra.message
+
+                                _ ->
+                                    -- Suppress click events if they happen during or at the end of a drag.
+                                    Cmd.none
 
                         ( _, Just doubleClickHandler, 2 ) ->
                             doubleClickHandler { button = args.button, pos = args.pos } value
