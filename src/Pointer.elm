@@ -10,6 +10,7 @@ module Pointer exposing
     , onClick, onDoubleClick, onDrag, onDragStart
     , onWheel, onPinch
     , onMove, onPointerUp
+    , preventDefaultOn, stopPropagationOn
     )
 
 {-| Pointer is a high-level pointer API that unifies pointer events over all
