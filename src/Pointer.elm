@@ -466,6 +466,220 @@ on (Model model) decoderFn =
         |> List.filterMap identity
 
 
+{-| Attaches a pointer model to a TEA view as a list of HTML event handler attributes.
+-}
+stopPropagationOn : Model a msg coordinates -> (EventKind -> Decoder a) -> List (Html.Attribute msg)
+stopPropagationOn (Model model) decoderFn =
+    let
+        stop =
+            Decode.map (\msg -> ( msg, True ))
+
+        down =
+            if
+                atLeastOnePointerDownHandler (Model model)
+                    || Maybe.Extra.isJust model.pinchHandler
+            then
+                Html.Events.stopPropagationOn "pointerdown"
+                    (withPointerEvent (decoderFn DownEvent) PointerDownEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        up =
+            if
+                atLeastOnePointerUpHandler (Model model)
+                    || Maybe.Extra.isJust model.pinchHandler
+            then
+                Html.Events.stopPropagationOn "pointerup"
+                    (withPointerEvent (decoderFn UpEvent) PointerUpEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        move =
+            if
+                atLeastOneMoveHandler (Model model)
+                    || Maybe.Extra.isJust model.pinchHandler
+            then
+                Html.Events.stopPropagationOn "pointermove"
+                    (withPointerEvent (decoderFn MoveEvent) PointerMoveEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        out =
+            if atLeastOneDragStartHandler (Model model) then
+                Html.Events.stopPropagationOn "pointerleave"
+                    (withLeaveEvent (decoderFn UpEvent) PointerLeaveEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        click =
+            if atLeastOneClickHandler (Model model) then
+                Html.Events.stopPropagationOn "click"
+                    (withMouseEvent (decoderFn ClickEvent) PointerClickEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        wheel =
+            model.wheelHandler
+                |> Maybe.map
+                    (\_ ->
+                        Html.Events.stopPropagationOn "wheel"
+                            (withWheel (decoderFn ScrollWheelEvent) MouseWheelEvent
+                                |> Decode.map model.toMsg
+                                |> stop
+                            )
+                    )
+
+        cancel =
+            Html.Events.stopPropagationOn "pointercancel"
+                (Decode.succeed PointerCancelEvent
+                    |> Decode.map model.toMsg
+                    |> stop
+                )
+                |> Just
+    in
+    [ down
+    , up
+    , move
+    , out
+    , click
+    , wheel
+    , cancel
+    ]
+        |> List.filterMap identity
+
+
+{-| Attaches a pointer model to a TEA view as a list of HTML event handler attributes.
+-}
+preventDefaultOn : Model a msg coordinates -> (EventKind -> Decoder a) -> List (Html.Attribute msg)
+preventDefaultOn (Model model) decoderFn =
+    let
+        stop =
+            Decode.map (\msg -> ( msg, True ))
+
+        down =
+            if
+                atLeastOnePointerDownHandler (Model model)
+                    || Maybe.Extra.isJust model.pinchHandler
+            then
+                Html.Events.preventDefaultOn "pointerdown"
+                    (withPointerEvent (decoderFn DownEvent) PointerDownEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        up =
+            if
+                atLeastOnePointerUpHandler (Model model)
+                    || Maybe.Extra.isJust model.pinchHandler
+            then
+                Html.Events.preventDefaultOn "pointerup"
+                    (withPointerEvent (decoderFn UpEvent) PointerUpEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        move =
+            if
+                atLeastOneMoveHandler (Model model)
+                    || Maybe.Extra.isJust model.pinchHandler
+            then
+                Html.Events.preventDefaultOn "pointermove"
+                    (withPointerEvent (decoderFn MoveEvent) PointerMoveEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        out =
+            if atLeastOneDragStartHandler (Model model) then
+                Html.Events.preventDefaultOn "pointerleave"
+                    (withLeaveEvent (decoderFn UpEvent) PointerLeaveEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        click =
+            if atLeastOneClickHandler (Model model) then
+                Html.Events.preventDefaultOn "click"
+                    (withMouseEvent (decoderFn ClickEvent) PointerClickEvent
+                        |> Decode.map model.toMsg
+                        |> stop
+                    )
+                    |> Just
+
+            else
+                Nothing
+
+        wheel =
+            model.wheelHandler
+                |> Maybe.map
+                    (\_ ->
+                        Html.Events.preventDefaultOn "wheel"
+                            (withWheel (decoderFn ScrollWheelEvent) MouseWheelEvent
+                                |> Decode.map model.toMsg
+                                |> stop
+                            )
+                    )
+
+        cancel =
+            Html.Events.preventDefaultOn "pointercancel"
+                (Decode.succeed PointerCancelEvent
+                    |> Decode.map model.toMsg
+                    |> stop
+                )
+                |> Just
+    in
+    [ down
+    , up
+    , move
+    , out
+    , click
+    , wheel
+    , cancel
+    ]
+        |> List.filterMap identity
+
+
 
 -- Control Logic
 
